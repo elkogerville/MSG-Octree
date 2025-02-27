@@ -249,7 +249,7 @@ def compute_com(pos, mass):
         Nx3 array where each row represents the [x, y, z] components of the center of mass of a particle
         N is the total number of particles
     total_mass: float
-        total mass of all the particles
+        total mass of all N particles
     Example
     --------
     N = 1000
