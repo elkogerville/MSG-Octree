@@ -30,7 +30,7 @@ def recursive_oct_divide(pos, vel, mass, origin, box_length, depth):
     origin: list[float]
         list containing the [x,y,z] coordinates of the center point of the simulation bounds
     box_length: int
-        length of each side of the bounding cube that contains all particles, centered at the origin.
+        length of each side of the bounding cube that contains all particles, centered at the origin
         sets the extent of the simulation volume
     depth: int
         specifies how many subdivisions when creating the octree, with higher numbers resulting in finer grids
@@ -39,7 +39,7 @@ def recursive_oct_divide(pos, vel, mass, origin, box_length, depth):
     -------
     coms: np.ndarray[np.float64]
         Mx3 array where each row represents the [x, y, z] coordinates of the center of mass for a cell in the octree
-        M is the total number of cells in the octree.
+        M is the total number of cells in the octree
     cell_masses: np.ndarray[np.float64]
         Mx1 array where each row represents the total mass of a cell in the octree
         M is the total number of cells in the octree
@@ -49,7 +49,7 @@ def recursive_oct_divide(pos, vel, mass, origin, box_length, depth):
     lengths_list: np.ndarray[np.float64]
         Mx1 array where each row contains the length of a cell cube in the octree
         M is the total number of cells in the octree
-    Examples
+    Example
     --------
     N = 1000
     box_length = 100
@@ -72,21 +72,20 @@ def recursive_oct_divide(pos, vel, mass, origin, box_length, depth):
     coms, cell_masses, centers_list, lengths_list = subdivide_cell(pos, vel, mass, origin, box_length)
     # number of tree depths
     for level in range(depth-1):
-        # sum COM of each cell to create a unique tag
+        # sum center of mass of each cell to create a unique tag
         com_sums = np.sum(coms, axis = 1)
         sums_list = np.unique(com_sums)
-        # loop through each COM sum
+        # loop through each center of mass sum
         for i in prange(sums_list.shape[0]):
-            # access all particles sharing a com (particles in the same cell)
+            # access all particles sharing a center of mass (particles in the same cell)
             com_sum = sums_list[i]
-            #idx = np.where(com_sums == com_sum)[0]
             mask = com_sums == com_sum
             # if number of particles > tolerance: subdivide into octants; else: skip
             if np.sum(mask) > tolerance:
                 center = centers_list[mask][0]
                 length = lengths_list[mask][0][0]
                 octant_coms, octant_masses, octant_centers, octant_lengths = subdivide_cell(pos[mask], vel[mask],
-                                                                                      mass[mask], center, length)
+                                                                                            mass[mask], center, length)
                 # create new unique tags for subdivided cells
                 octant_com_sums = np.sum(octant_coms, axis = 1)
                 octant_sums_list = np.unique(octant_com_sums)
@@ -99,7 +98,7 @@ def recursive_oct_divide(pos, vel, mass, origin, box_length, depth):
                     cell_masses[new_idx] = octant_masses[new_mask]
                     centers_list[new_idx] = octant_centers[new_mask]
                     lengths_list[new_idx] = octant_lengths[new_mask]
-
+            # skip cell if particles <= tolerance
             else:
                 continue
 
@@ -107,8 +106,42 @@ def recursive_oct_divide(pos, vel, mass, origin, box_length, depth):
 
 @njit()
 def subdivide_cell(pos, vel, mass, origin, length):
-    '''subdivide simulation phase space into 8 octants'''
-    # octdivide tree node
+    '''
+    divides a given volume of arbitrary size containing particles into 8 equal-length octants centered around an origin point
+    Parameters
+    ----------
+    pos: np.ndarray[np.float64]
+        Nx3 array of particle positions where each row represents the [x, y, z] position coordinates of a particle in 3D space
+        N is the total number of particles
+    vel: np.ndarray[np.float64]
+        Nx3 array of particle velocities where each row represents the [x, y, z] velocity components for a particle in 3D space
+        N is the total number of particles
+    mass: np.ndarray[np.float64]
+        Nx1 array where each row represents the mass of a particle
+        N is the number of particles
+    origin: list[float]
+        list containing the [x,y,z] coordinates of the center point of the simulation bounds
+    length: float
+        length of the current cell's side before it is divided into 8 octants
+    Returns
+    -------
+    coms: np.ndarray[np.float64]
+        Mx3 array where each row represents the [x, y, z] coordinates of the center of mass for a cell in the octree
+        M is the total number of cells in the octree.
+    cell_masses: np.ndarray[np.float64]
+        Mx1 array where each row represents the total mass of a cell in the octree
+        M is the total number of cells in the octree
+    centers_list: np.ndarray[np.float64]
+        Mx3 array where each row contains the [x, y, z] coordinates of the center of a cell in the octree
+        M is the total number of cells in the octree
+    lengths_list: np.ndarray[np.float64]
+        Mx1 array where each row contains the length of a cell cube in the octree
+        M is the total number of cells in the octree
+    Notes
+    -----
+    this is a helper function for recursive_oct_divide() and it only divides a given volume into 8 octants once
+    '''
+    # define set of masks to divide a set of particles into 8 octants
     masks = [(pos[:,0] > origin[0]) & (pos[:,1] > origin[1]) & (pos[:,2] > origin[2]),
              (pos[:,0] > origin[0]) & (pos[:,1] > origin[1]) & (pos[:,2] < origin[2]),
              (pos[:,0] < origin[0]) & (pos[:,1] > origin[1]) & (pos[:,2] > origin[2]),
@@ -117,7 +150,7 @@ def subdivide_cell(pos, vel, mass, origin, length):
              (pos[:,0] < origin[0]) & (pos[:,1] < origin[1]) & (pos[:,2] < origin[2]),
              (pos[:,0] > origin[0]) & (pos[:,1] < origin[1]) & (pos[:,2] > origin[2]),
              (pos[:,0] > origin[0]) & (pos[:,1] < origin[1]) & (pos[:,2] < origin[2])]
-    # compute new centers
+    # compute new centers of each octant
     centers = np.array([[origin[0] + length/4, origin[1] + length/4, origin[2] + length/4],
                         [origin[0] + length/4, origin[1] + length/4, origin[2] - length/4],
                         [origin[0] - length/4, origin[1] + length/4, origin[2] + length/4],
@@ -135,10 +168,11 @@ def subdivide_cell(pos, vel, mass, origin, length):
     for i in prange(centers.shape[0]):
         mask = masks[i]
         center = centers[i]
-        # skip empty masks
+        # skip empty octants
         if np.any(mask):
-            # compute center of mass and total mass of cell
+            # compute center of mass and total mass of octant
             com, cell_mass = compute_com(pos[mask], mass[mask])
+            # update octree
             coms[mask] = com
             cell_masses[mask] = cell_mass
             centers_list[mask] = center
@@ -199,7 +233,30 @@ def traverse_octree(sum_com_dict, sums_list, r_sq, theta_sq, lengths_list):
 
 @njit(inline = 'always')
 def compute_com(pos, mass):
-    '''computes center of mass for a set of particles'''
+    '''
+    computes the center of mass and total mass of a given set of particles
+    Parameters
+    ----------
+    pos: np.ndarray[np.float64]
+        Nx3 array of particle positions where each row represents the [x, y, z] position coordinates of a particle in 3D space
+        N is the total number of particles
+    mass: np.ndarray[np.float64]
+        Nx1 array where each row represents the mass of a particle
+        N is the number of particles
+    Returns
+    -------
+    com: np.ndarray[np.float64]
+        Nx3 array where each row represents the [x, y, z] components of the center of mass of a particle
+        N is the total number of particles
+    total_mass: float
+        total mass of all the particles
+    Example
+    --------
+    N = 1000
+    pos = np.random.rand(N,3)
+    mass = np.ones((N,1))/N
+    com, total_mass = compute_com(pos, mass)
+    '''
     total_mass = np.sum(mass)
     com = np.sum(pos*mass, axis = 0)/total_mass
 
